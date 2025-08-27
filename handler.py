@@ -20,7 +20,26 @@ def _latest_mp4(directory: Path):
     files = sorted(directory.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
     return files[0] if files else None
 
+def ensure_models():
+    """
+    Download SadTalker checkpoints on first run if missing.
+    Uses the repo's scripts/download_models.sh to fetch:
+      - epoch_20.pth (face recon)
+      - gfpgan/real-esrgan, wav2lip, hubert, etc.
+    """
+    ck = REPO_DIR / "checkpoints" / "epoch_20.pth"
+    if ck.exists():
+        return
+    print("[init] downloading SadTalker checkpoints (one-time)…")
+    cmd = 'cd /workspace/SadTalker && mkdir -p checkpoints && if [ -f scripts/download_models.sh ]; then bash scripts/download_models.sh; else echo "No script found"; fi'
+    proc = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True, timeout=1800)
+    print("[init] download_models stdout:\n", proc.stdout[-1000:])
+    print("[init] download_models stderr:\n", proc.stderr[-2000:])
+    if proc.returncode != 0 or not ck.exists():
+        raise RuntimeError("Failed to download SadTalker checkpoints. See logs above.")
+
 def _run_sadtalker(audio_path: Path, image_path: Path, work_dir: Path) -> Path:
+    ensure_models()
     cmd = [
         "python", "inference.py",
         "--driven_audio", str(audio_path),
@@ -30,9 +49,9 @@ def _run_sadtalker(audio_path: Path, image_path: Path, work_dir: Path) -> Path:
         "--still",
         "--preprocess", "full"
     ]
-    proc = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    proc = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True, timeout=1800)
     if proc.returncode != 0:
-        raise RuntimeError(f"SadTalker failed: {proc.stderr[:2000]}")
+        raise RuntimeError(f"SadTalker failed: {proc.stderr[:4000]}")
     out_mp4 = _latest_mp4(OUT_DIR)
     if not out_mp4:
         raise RuntimeError("SadTalker did not produce an MP4 in /tmp/out")
