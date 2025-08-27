@@ -1,4 +1,4 @@
-import base64, os, time, uuid, subprocess, json
+import base64, os, time, uuid, subprocess
 from pathlib import Path
 import requests
 from runpod.serverless import start
@@ -7,14 +7,16 @@ REPO_DIR = Path("/workspace/SadTalker").resolve()
 OUT_DIR = Path("/tmp/out").resolve(); OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def _save_b64(data_b64: str, dest: Path):
-    with open(dest, "wb") as f: f.write(base64.b64decode(data_b64))
+    with open(dest, "wb") as f:
+        f.write(base64.b64decode(data_b64))
 
 def _download(url: str, dest: Path):
-    with requests.get(url, stream=True, timeout=60) as r:
+    with requests.get(url, stream=True, timeout=120) as r:
         r.raise_for_status()
         with open(dest, "wb") as f:
-            for chunk in r.iter_content(8192):
-                if chunk: f.write(chunk)
+            for chunk in r.iter_content(1024 * 512):
+                if chunk:
+                    f.write(chunk)
 
 def _latest_mp4(directory: Path):
     files = sorted(directory.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -22,21 +24,34 @@ def _latest_mp4(directory: Path):
 
 def ensure_models():
     """
-    Download SadTalker checkpoints on first run if missing.
-    Uses the repo's scripts/download_models.sh to fetch:
-      - epoch_20.pth (face recon)
-      - gfpgan/real-esrgan, wav2lip, hubert, etc.
+    Ensure SadTalker checkpoints exist. If missing, download the minimal set.
     """
-    ck = REPO_DIR / "checkpoints" / "epoch_20.pth"
-    if ck.exists():
-        return
-    print("[init] downloading SadTalker checkpoints (one-time)…")
-    cmd = 'cd /workspace/SadTalker && mkdir -p checkpoints && if [ -f scripts/download_models.sh ]; then bash scripts/download_models.sh; else echo "No script found"; fi'
-    proc = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True, timeout=1800)
-    print("[init] download_models stdout:\n", proc.stdout[-1000:])
-    print("[init] download_models stderr:\n", proc.stderr[-2000:])
-    if proc.returncode != 0 or not ck.exists():
-        raise RuntimeError("Failed to download SadTalker checkpoints. See logs above.")
+    ck_dir = (REPO_DIR / "checkpoints").resolve(); ck_dir.mkdir(parents=True, exist_ok=True)
+    gfp_dir = (REPO_DIR / "gfpgan" / "weights").resolve(); gfp_dir.mkdir(parents=True, exist_ok=True)
+
+    need = {
+        ck_dir / "epoch_20.pth": "https://github.com/Winfredy/SadTalker/releases/download/v0.0.2/epoch_20.pth",
+        ck_dir / "mapping_00109-model.pth.tar": "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00109-model.pth.tar",
+        ck_dir / "mapping_00229-model.pth.tar": "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00229-model.pth.tar",
+        ck_dir / "SadTalker_V0.0.2_256.safetensors": "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/SadTalker_V0.0.2_256.safetensors",
+        gfp_dir / "alignment_WFLW_4HG.pth": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/alignment_WFLW_4HG.pth",
+        gfp_dir / "detection_Resnet50_Final.pth": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+        gfp_dir / "GFPGANv1.4.pth": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
+    }
+
+    for path, url in need.items():
+        if path.exists():
+            continue
+        print(f"[init] downloading {path.name} …")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        proc = subprocess.run(
+            ["bash", "-lc", f"curl -fL --retry 5 --retry-all-errors -o '{path}' '{url}'"],
+            capture_output=True, text=True
+        )
+        if proc.returncode != 0 or not path.exists():
+            raise RuntimeError(f"Failed to download {path.name}: {proc.stderr[-400:]} {proc.stdout[-200:]}")
+
+    print("[init] checkpoints present ✔")
 
 def _run_sadtalker(audio_path: Path, image_path: Path, work_dir: Path) -> Path:
     ensure_models()
@@ -51,7 +66,9 @@ def _run_sadtalker(audio_path: Path, image_path: Path, work_dir: Path) -> Path:
     ]
     proc = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True, timeout=1800)
     if proc.returncode != 0:
-        raise RuntimeError(f"SadTalker failed: {proc.stderr[:4000]}")
+        # include a tail of stdout/stderr to help debugging
+        raise RuntimeError(f"SadTalker failed: \n{proc.stderr[-4000:]}")
+
     out_mp4 = _latest_mp4(OUT_DIR)
     if not out_mp4:
         raise RuntimeError("SadTalker did not produce an MP4 in /tmp/out")
@@ -59,7 +76,7 @@ def _run_sadtalker(audio_path: Path, image_path: Path, work_dir: Path) -> Path:
 
 def handler(event):
     t0 = time.time()
-    inp = event.get("input", {})
+    inp = event.get("input", {}) or {}
     audio_url, image_url = inp.get("audio_url"), inp.get("image_url")
     audio_b64, image_b64 = inp.get("audio_b64"), inp.get("image_b64")
     upload_url, public_video_url = inp.get("upload_url"), inp.get("video_url")
@@ -72,8 +89,11 @@ def handler(event):
     i_path = OUT_DIR / f"{uid}_image.jpg"
 
     try:
-        _save_b64(audio_b64, a_path) if audio_b64 else _download(audio_url, a_path)
-        _save_b64(image_b64, i_path) if image_b64 else _download(image_url, i_path)
+        if audio_b64: _save_b64(audio_b64, a_path)
+        else: _download(audio_url, a_path)
+
+        if image_b64: _save_b64(image_b64, i_path)
+        else: _download(image_url, i_path)
 
         mp4_path = _run_sadtalker(a_path, i_path, REPO_DIR)
 
