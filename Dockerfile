@@ -20,6 +20,8 @@ RUN git lfs install && \
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
+RUN pip install --no-cache-dir "numpy>=1.24,<2" "scipy<1.11"
+
 # No model pre-download; they’ll fetch on first run
 COPY handler.py /workspace/handler.py
 
