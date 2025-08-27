@@ -35,7 +35,7 @@ def _robust_download(path: Path, urls):
     path.parent.mkdir(parents=True, exist_ok=True)
     errs = []
     for url in urls:
-        cmd = ["bash","-lc", f"curl -fL --retry 5 --retry-all-errors -o '{path}' '{url}'"]
+        cmd = ["bash","-lc", f"curl -fL --retry 5  -o '{path}' '{url}'"]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if path.exists() and path.stat().st_size > 1024:
             return
