@@ -23,35 +23,10 @@ def _latest_mp4(directory: Path):
     return files[0] if files else None
 
 def ensure_models():
-    """
-    Ensure SadTalker checkpoints exist. If missing, download the minimal set.
-    """
-    ck_dir = (REPO_DIR / "checkpoints").resolve(); ck_dir.mkdir(parents=True, exist_ok=True)
-    gfp_dir = (REPO_DIR / "gfpgan" / "weights").resolve(); gfp_dir.mkdir(parents=True, exist_ok=True)
+    # delegate to verbose/multi-mirror implementation
+    from ensure_models_patch import ensure_models_verbose
+    ensure_models_verbose()
 
-    need = {
-        ck_dir / "epoch_20.pth": "https://github.com/Winfredy/SadTalker/releases/download/v0.0.2/epoch_20.pth",
-        ck_dir / "mapping_00109-model.pth.tar": "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00109-model.pth.tar",
-        ck_dir / "mapping_00229-model.pth.tar": "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00229-model.pth.tar",
-        ck_dir / "SadTalker_V0.0.2_256.safetensors": "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/SadTalker_V0.0.2_256.safetensors",
-        gfp_dir / "alignment_WFLW_4HG.pth": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/alignment_WFLW_4HG.pth",
-        gfp_dir / "detection_Resnet50_Final.pth": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-        gfp_dir / "GFPGANv1.4.pth": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
-    }
-
-    for path, url in need.items():
-        if path.exists():
-            continue
-        print(f"[init] downloading {path.name} …")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        proc = subprocess.run(
-            ["bash", "-lc", f"curl -fL --retry 5 --retry-all-errors -o '{path}' '{url}'"],
-            capture_output=True, text=True
-        )
-        if proc.returncode != 0 or not path.exists():
-            raise RuntimeError(f"Failed to download {path.name}: {proc.stderr[-400:]} {proc.stdout[-200:]}")
-
-    print("[init] checkpoints present ✔")
 
 def _run_sadtalker(audio_path: Path, image_path: Path, work_dir: Path) -> Path:
     ensure_models()
