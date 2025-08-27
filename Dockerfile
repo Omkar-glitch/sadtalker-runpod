@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir "numpy>=1.24,<2" "scipy<1.11"
 
 # No model pre-download; they’ll fetch on first run
 COPY handler.py /workspace/handler.py
+COPY ensure_models_patch.py /workspace/ensure_models_patch.py
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /workspace/SadTalker
