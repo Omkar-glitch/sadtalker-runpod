@@ -1,32 +1,30 @@
 FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
-# prevent tzdata from asking questions during build
+# non-interactive setup
 ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
-
 RUN apt-get update && apt-get install -y -q \
     git git-lfs ffmpeg wget curl tzdata \
  && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
  && dpkg-reconfigure -f noninteractive tzdata \
  && rm -rf /var/lib/apt/lists/*
 
+# work from /workspace so our files are importable
 WORKDIR /workspace
 
-# Shallow clone (faster) and install SadTalker deps
+# SadTalker clone + its own requirements
 RUN git lfs install && \
     git clone --depth 1 https://github.com/OpenTalker/SadTalker.git && \
     cd SadTalker && pip install --no-cache-dir -r requirements.txt
 
-# Worker deps only
+# our worker deps (adds fastapi/uvicorn/pydantic + your numpy/scipy pins)
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
-RUN pip install --no-cache-dir "numpy>=1.24,<2" "scipy<1.11"
-
-# No model pre-download; they’ll fetch on first run
+# our code
 COPY handler.py /workspace/handler.py
+COPY http_server.py /workspace/http_server.py
 COPY ensure_models_patch.py /workspace/ensure_models_patch.py
 
-ENV PYTHONUNBUFFERED=1
-WORKDIR /workspace
+# expose HTTP and start uvicorn web server on port 8000
 EXPOSE 8000
-CMD ["python","-m","uvicorn","http_server:app","--host","0.0.0.0","--port","8000"]
+CMD ["python","-m","uvicorn","http_server:app","--host","0.0.0.0","--port","8000","--app-dir","/workspace"]

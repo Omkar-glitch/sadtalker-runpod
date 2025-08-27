@@ -1,7 +1,10 @@
 import base64, os, time, uuid, subprocess
 from pathlib import Path
 import requests
-from runpod.serverless import start
+try:
+    from runpod.serverless import start
+except Exception:
+    start = None
 
 # --------------------------------------------------------------------------------
 # Config / Paths
@@ -158,4 +161,5 @@ def handler(event):
         return {"ok": False, "error": str(e)}
 
 if __name__ == "__main__":
-    start({"handler": handler})
+    if start is not None:
+        start({"handler": handler})
