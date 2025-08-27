@@ -1,0 +1,4 @@
+# keep NumPy 1.x line (compatible with PyTorch & SciPy in SadTalker)
+numpy>=1.24,<2
+# SciPy versions compatible with NumPy 1.x
+scipy<1.11
