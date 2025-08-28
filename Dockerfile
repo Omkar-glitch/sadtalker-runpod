@@ -13,7 +13,13 @@ WORKDIR /workspace
 
 # SadTalker clone + combined requirements install
 COPY requirements.txt /workspace/requirements.txt
-RUN git lfs install &&     git clone --depth 1 https://github.com/OpenTalker/SadTalker.git &&     sed -i 's/np.float/float/g' /workspace/SadTalker/src/face3d/util/my_awing_arch.py &&     /opt/conda/bin/pip install --no-cache-dir -r SadTalker/requirements.txt &&     /opt/conda/bin/pip install --no-cache-dir -r /workspace/requirements.txt
+RUN git lfs install && \
+    git clone --depth 1 https://github.com/OpenTalker/SadTalker.git && \
+    /opt/conda/bin/pip install --no-cache-dir -r SadTalker/requirements.txt && \
+    /opt/conda/bin/pip install --no-cache-dir -r /workspace/requirements.txt
+
+# Patch SadTalker code AFTER installation to prevent overwrites
+RUN sed -i 's/np.float/float/g' /workspace/SadTalker/src/face3d/util/my_awing_arch.py
 
 # our code
 COPY handler.py /workspace/handler.py
