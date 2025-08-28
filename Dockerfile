@@ -5,9 +5,7 @@ FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python 3.8, pip, git, and ffmpeg
-RUN apt-get update && apt-get install -y -q \
-    python3.8 python3.8-pip python3-pip git git-lfs ffmpeg wget \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y software-properties-common && add-apt-repository ppa:deadsnakes/ppa && apt-get update && apt-get install -y -q python3.8 python3.8-pip python3-pip git git-lfs ffmpeg wget && rm -rf /var/lib/apt/lists/*
 
 # Update alternatives to make python3.8 the default python
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1
