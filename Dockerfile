@@ -11,6 +11,9 @@ WORKDIR /workspace
 RUN git lfs install && \
     git clone --branch v0.0.2 --single-branch https://github.com/OpenTalker/SadTalker.git
 
+# Diagnostic step to find the correct path for the patch
+RUN ls -R /workspace/SadTalker
+
 # Modify SadTalker's requirements to remove numpy version pin, then install
 RUN sed -i 's/numpy==1.23.4/numpy/g' /workspace/SadTalker/requirements.txt && \
     pip install -r /workspace/SadTalker/requirements.txt
