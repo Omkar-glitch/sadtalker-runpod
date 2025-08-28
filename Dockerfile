@@ -14,7 +14,7 @@ WORKDIR /workspace
 # SadTalker clone + combined requirements install
 COPY requirements.txt /workspace/requirements.txt
 RUN git lfs install && \
-    git clone --depth 1 https://github.com/OpenTalker/SadTalker.git && \
+    git clone --branch v0.0.2 --single-branch https://github.com/OpenTalker/SadTalker.git && \
     /opt/conda/bin/pip install --no-cache-dir -r SadTalker/requirements.txt && \
     /opt/conda/bin/pip install --no-cache-dir -r /workspace/requirements.txt
 
