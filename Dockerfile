@@ -22,9 +22,9 @@ RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
 # our code
 COPY handler.py /workspace/handler.py
-COPY http_server.py /workspace/http_server.py
+
 COPY ensure_models_patch.py /workspace/ensure_models_patch.py
 
 # expose HTTP and start uvicorn web server on port 8000
-EXPOSE 8000
-CMD ["python","-m","uvicorn","http_server:app","--host","0.0.0.0","--port","8000","--app-dir","/workspace"]
+EXPOSE 8888
+CMD ["python", "/workspace/handler.py"]
