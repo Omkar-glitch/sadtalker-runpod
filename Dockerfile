@@ -1,5 +1,5 @@
-# Base image with correct PyTorch, CUDA, and Python for SadTalker v0.0.2
-FROM pytorch/pytorch:1.12.1-cuda11.3-cudnn8-runtime
+# Base image that we know is compatible with our requirements
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
 # Install git and ffmpeg
 RUN apt-get update && apt-get install -y -q git git-lfs ffmpeg && rm -rf /var/lib/apt/lists/*
@@ -7,22 +7,19 @@ RUN apt-get update && apt-get install -y -q git git-lfs ffmpeg && rm -rf /var/li
 # Set working directory
 WORKDIR /workspace
 
-# Clone the stable v0.0.2 release of SadTalker
+# Clone the main branch of SadTalker
 RUN git lfs install && \
-    git clone --branch v0.0.2 --single-branch https://github.com/OpenTalker/SadTalker.git
+    git clone https://github.com/OpenTalker/SadTalker.git
 
-# Modify SadTalker's requirements to remove numpy version pin, then install
-RUN sed -i 's/numpy==1.23.4/numpy/g' /workspace/SadTalker/requirements.txt && \
-    pip install -r /workspace/SadTalker/requirements.txt
-
-# Patch the numpy.float error in the installed dependency by finding the file first
-RUN find /opt/conda -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
-
-# Copy and install our own requirements
+# Install all requirements
 COPY requirements.txt /workspace/requirements.txt
-RUN pip install -r /workspace/requirements.txt
+RUN pip install -r /workspace/SadTalker/requirements.txt && \
+    pip install -r /workspace/requirements.txt
 
-# Force-install runpod library as the final step
+# Patch the numpy.float error by finding the file in the installed packages
+RUN find /opt/conda/lib -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
+
+# Force-install runpod library as the final step to ensure it is present
 RUN pip install runpod
 
 # Copy our handler code
