@@ -21,7 +21,9 @@ RUN pip install -r /workspace/SadTalker/requirements.txt && \
     pip install -r /workspace/SadTalker/requirements.txt
 
 # Patch 1: Fix the numpy.float error
-RUN find /opt/conda/lib -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
+RUN echo "--- Searching for my_awing_arch.py ---" && \
+    find /opt/conda/lib -type f -name "my_awing_arch.py" -print -exec echo "--- Content before patch ---" \; -exec cat {} \; -exec sed -i 's/np.float/float/g' {} \; -exec echo "--- Content after patch ---" \; -exec cat {} \; && \
+    echo "--- Search and patch finished ---"
 
 # Patch 2: Fix the ValueError by ensuring the array elements are scalars
 RUN find /opt/conda/lib -type f -name "preprocess.py" -exec sed -i 's/trans_params = np.array(\[w0, h0, s, t\[0\]\])/trans_params = np.array([w0, h0, s.item(), t[0].item(), t[1].item()])/g' {} +
