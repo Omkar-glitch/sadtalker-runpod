@@ -20,6 +20,9 @@ COPY handler.py /workspace/handler.py
 
 COPY ensure_models_patch.py /workspace/ensure_models_patch.py
 
+# Final, forceful installation and verification of the runpod library
+RUN pip install runpod && python -c "import runpod; print('runpod library successfully verified')"
+
 # expose HTTP and start uvicorn web server on port 8000
 EXPOSE 8888
 CMD ["python", "/workspace/handler.py"]
