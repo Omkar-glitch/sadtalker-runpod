@@ -20,6 +20,9 @@ COPY handler.py /workspace/handler.py
 
 COPY ensure_models_patch.py /workspace/ensure_models_patch.py
 
+# Diagnostic step to find python and pip
+RUN echo "--- Finding Python and Pip ---" && which python && which pip && ls -l /usr/bin/python* && ls -l /usr/local/bin/python* && echo "--- Diagnostics Done ---"
+
 # Final, forceful installation and verification of the runpod library
 RUN pip install runpod && python -c "import runpod; print('runpod library successfully verified')"
 
