@@ -15,8 +15,8 @@ RUN git lfs install && \
 RUN sed -i 's/numpy==1.23.4/numpy/g' /workspace/SadTalker/requirements.txt && \
     pip install -r /workspace/SadTalker/requirements.txt
 
-# Patch the numpy.float error in SadTalker source by finding the file first
-RUN find /workspace/SadTalker -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
+# Patch the numpy.float error in the installed dependency by finding the file first
+RUN find /opt/conda -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
 
 # Copy and install our own requirements
 COPY requirements.txt /workspace/requirements.txt
