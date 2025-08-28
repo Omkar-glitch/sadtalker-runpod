@@ -18,7 +18,7 @@ RUN git lfs install && \
 # Install all requirements
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install -r /workspace/SadTalker/requirements.txt && \
-    pip install -r /workspace/requirements.txt
+    pip install -r /workspace/SadTalker/requirements.txt
 
 # Patch 1: Fix the numpy.float error
 RUN find /opt/conda/lib -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
