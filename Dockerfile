@@ -1,6 +1,10 @@
 # Base image that we know is compatible with our requirements
 FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
+# Set timezone to prevent interactive prompts
+ENV TZ=Etc/UTC
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install git and ffmpeg
 RUN apt-get update && apt-get install -y -q git git-lfs ffmpeg && rm -rf /var/lib/apt/lists/*
 
