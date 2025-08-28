@@ -1,38 +1,60 @@
-# Final Dockerfile based on extensive debugging and research
+# 1. Base image with a compatible CUDA version
+FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
 
-# 1. Use the Pytorch image that we know builds successfully.
-FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
-
-# 2. Set timezone to prevent interactive prompts
-ENV TZ=Etc/UTC
+# 2. Set environment variables to prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
 
-# 3. Install all necessary system packages, including curl.
-RUN apt-get update && apt-get install -y -q git git-lfs ffmpeg curl && rm -rf /var/lib/apt/lists/*
+# 3. Install system dependencies
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+    git git-lfs wget curl build-essential libssl-dev zlib1g-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev libncursesw5-dev xz-utils tk-dev \
+    libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev ffmpeg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# 4. Set working directory
-WORKDIR /workspace
+# 4. Create a non-root user
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:${PATH}
+WORKDIR ${HOME}/app
 
-# 5. Clone the main branch of SadTalker, which is compatible with this environment
+# 5. Install pyenv to manage python versions
+RUN curl https://pyenv.run | bash
+ENV PATH=${HOME}/.pyenv/shims:${HOME}/.pyenv/bin:${PATH}
+ENV PYTHON_VERSION=3.10.9
+
+# 6. Install the correct python version and set it as global
+RUN pyenv install ${PYTHON_VERSION} && \
+    pyenv global ${PYTHON_VERSION} && \
+    pip install --no-cache-dir -U pip setuptools wheel
+
+# 7. Install a compatible PyTorch version
+RUN pip install --no-cache-dir -U torch==1.12.1 torchvision==0.13.1
+
+# 8. Clone the main branch of SadTalker
 RUN git lfs install && \
     git clone https://github.com/OpenTalker/SadTalker.git
 
-# 6. Install all Python requirements from both files
-COPY requirements.txt /workspace/requirements.txt
-RUN pip install -r /workspace/SadTalker/requirements.txt && \
-    pip install -r /workspace/requirements.txt
+# 9. Install SadTalker's requirements
+RUN pip install -r ${HOME}/app/SadTalker/requirements.txt
 
-# 7. Patch 1: Fix the numpy.float error by finding the file and replacing the deprecated alias.
-RUN find /opt/conda/lib -type f -name "my_awing_arch.py" -exec sed -i "s/np.float/float/g" {} +
+# 10. Apply our known patches to the installed libraries
+RUN find ${HOME}/.pyenv/versions/${PYTHON_VERSION} -type f -name "my_awing_arch.py" -exec sed -i "s/np.float/float/g" {} +
+RUN find ${HOME}/.pyenv/versions/${PYTHON_VERSION} -type f -name "preprocess.py" -exec sed -i "s/trans_params = np.array(\[w0, h0, s, t\[0\], t\[1\]\])/trans_params = np.array([w0, h0, s, t[0], t[1]], dtype=object)/g" {} +
 
-# 8. Patch 2: Fix the ValueError by finding the file and adding dtype=object to the numpy array creation.
-RUN find /opt/conda/lib -type f -name "preprocess.py" -exec sed -i "s/trans_params = np.array(\[w0, h0, s, t\[0\], t\[1\]\])/trans_params = np.array([w0, h0, s, t[0], t[1]], dtype=object)/g" {} +
+# 11. Copy and install our own requirements
+COPY --chown=user requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# 9. Force-install runpod library as the final step to ensure it is present.
+# 12. Install runpod
 RUN pip install runpod
 
-# 10. Copy our handler code
-COPY handler.py /workspace/handler.py
+# 13. Copy our handler code
+COPY --chown=user handler.py ${HOME}/app/handler.py
 
-# 11. Set the command to run our handler
-CMD ["python", "/workspace/handler.py"]
+# 14. Set the final command to run our handler
+CMD ["python", "handler.py"]
