@@ -11,8 +11,9 @@ WORKDIR /workspace
 RUN git lfs install && \
     git clone --branch v0.0.2 --single-branch https://github.com/OpenTalker/SadTalker.git
 
-# Install SadTalker's requirements
-RUN pip install -r /workspace/SadTalker/requirements.txt
+# Modify SadTalker's requirements to remove numpy version pin, then install
+RUN sed -i 's/numpy==1.23.4/numpy/g' /workspace/SadTalker/requirements.txt && \
+    pip install -r /workspace/SadTalker/requirements.txt
 
 # Patch the numpy.float error in SadTalker source
 RUN sed -i 's/np.float/float/g' /workspace/SadTalker/src/face3d/util/my_awing_arch.py
