@@ -1,25 +1,54 @@
-# 1. Use RunPod's official base image for compatibility
-FROM runpod/base:0.5.5-cuda11.8-runtime
+# Final, most robust Dockerfile
 
-# 2. Install OS packages
-ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
-RUN apt-get update &&     apt-get install -y --no-install-recommends git git-lfs ffmpeg curl &&     apt-get clean && rm -rf /var/lib/apt/lists/*
+# 1. Start from the correct CUDA base image
+FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
 
-# 3. Set the working directory
+# 2. Set timezone and non-interactive frontend
+ENV TZ=Etc/UTC
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 3. Install system dependencies and add PPA for Python 3.8
+RUN apt-get update && \
+    apt-get install -y software-properties-common wget git git-lfs ffmpeg && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update
+
+# 4. Install Python 3.8
+RUN apt-get install -y python3.8
+
+# 5. Install pip for Python 3.8 manually
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3.8 get-pip.py
+
+# 6. Make python3.8 the default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1
+
+# 7. Set working directory
 WORKDIR /workspace
 
-# 4. Clone a known-stable version of SadTalker
-RUN git lfs install &&     git clone --depth 1 --branch v0.0.2 https://github.com/OpenTalker/SadTalker.git
+# 8. Clone the stable v0.0.2 release of SadTalker
+RUN git lfs install && \
+    git clone --branch v0.0.2 --single-branch https://github.com/OpenTalker/SadTalker.git
 
-# 5. Install pinned Python dependencies to create a stable environment
+# 9. Install the specific PyTorch version for this release
+RUN pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+
+# 10. Patch SadTalker's requirements and then install them
+RUN sed -i 's/numpy==1.23.4/numpy/g' /workspace/SadTalker/requirements.txt && \
+    pip install -r /workspace/SadTalker/requirements.txt
+
+# 11. Patch the numpy.float error in the installed dependency
+RUN find /usr/local/lib -type f -name "my_awing_arch.py" -exec sed -i 's/np.float/float/g' {} +
+
+# 12. Copy and install our own requirements
 COPY requirements.txt /workspace/requirements.txt
-RUN pip install --upgrade pip==23.3.1 &&     pip install numpy==1.23.5 face-alignment==1.3.4 &&     pip install -r /workspace/SadTalker/requirements.txt &&     pip install -r /workspace/requirements.txt &&     pip install runpod==1.2.0
+RUN pip install -r /workspace/requirements.txt
 
-# 6. Download checkpoints at build time for faster startups
-RUN mkdir -p /workspace/SadTalker/checkpoints &&     curl -L -o /workspace/SadTalker/checkpoints/wav2lip.pth          https://huggingface.co/innnky/sadtalker/resolve/main/wav2lip.pth &&     curl -L -o /workspace/SadTalker/checkpoints/auido2pose.pth          https://huggingface.co/innnky/sadtalker/resolve/main/auido2pose.pth &&     curl -L -o /workspace/SadTalker/checkpoints/mapping.pth          https://huggingface.co/innnky/sadtalker/resolve/main/mapping_00109-model.pth
+# 13. Install runpod
+RUN pip install runpod
 
-# 7. Copy our handler code
+# 14. Copy our handler code
 COPY handler.py /workspace/handler.py
 
-# 8. Set the runtime command
-CMD ["python", "handler.py"]
+# 15. Set the final command to run our handler
+CMD ["python", "/workspace/handler.py"]
