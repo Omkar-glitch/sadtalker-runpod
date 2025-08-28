@@ -1,60 +1,25 @@
-# 1. Base image with a compatible CUDA version
-FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
+# 1. Use RunPod's official base image for compatibility
+FROM runpod/base:0.5.5-cuda11.8-runtime
 
-# 2. Set environment variables to prevent interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
+# 2. Install OS packages
+ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
+RUN apt-get update &&     apt-get install -y --no-install-recommends git git-lfs ffmpeg curl &&     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 3. Install system dependencies
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-    git git-lfs wget curl build-essential libssl-dev zlib1g-dev \
-    libbz2-dev libreadline-dev libsqlite3-dev libncursesw5-dev xz-utils tk-dev \
-    libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev ffmpeg && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# 3. Set the working directory
+WORKDIR /workspace
 
-# 4. Create a non-root user
-RUN useradd -m -u 1000 user
-USER user
-ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:${PATH}
-WORKDIR ${HOME}/app
+# 4. Clone a known-stable version of SadTalker
+RUN git lfs install &&     git clone --depth 1 --branch v0.0.2 https://github.com/OpenTalker/SadTalker.git
 
-# 5. Install pyenv to manage python versions
-RUN curl https://pyenv.run | bash
-ENV PATH=${HOME}/.pyenv/shims:${HOME}/.pyenv/bin:${PATH}
-ENV PYTHON_VERSION=3.10.9
+# 5. Install pinned Python dependencies to create a stable environment
+COPY requirements.txt /workspace/requirements.txt
+RUN pip install --upgrade pip==23.3.1 &&     pip install numpy==1.23.5 face-alignment==1.3.4 &&     pip install -r /workspace/SadTalker/requirements.txt &&     pip install -r /workspace/requirements.txt &&     pip install runpod==1.2.0
 
-# 6. Install the correct python version and set it as global
-RUN pyenv install ${PYTHON_VERSION} && \
-    pyenv global ${PYTHON_VERSION} && \
-    pip install --no-cache-dir -U pip setuptools wheel
+# 6. Download checkpoints at build time for faster startups
+RUN mkdir -p /workspace/SadTalker/checkpoints &&     curl -L -o /workspace/SadTalker/checkpoints/wav2lip.pth          https://huggingface.co/innnky/sadtalker/resolve/main/wav2lip.pth &&     curl -L -o /workspace/SadTalker/checkpoints/auido2pose.pth          https://huggingface.co/innnky/sadtalker/resolve/main/auido2pose.pth &&     curl -L -o /workspace/SadTalker/checkpoints/mapping.pth          https://huggingface.co/innnky/sadtalker/resolve/main/mapping_00109-model.pth
 
-# 7. Install a compatible PyTorch version
-RUN pip install --no-cache-dir -U torch==1.12.1 torchvision==0.13.1
+# 7. Copy our handler code
+COPY handler.py /workspace/handler.py
 
-# 8. Clone the main branch of SadTalker
-RUN git lfs install && \
-    git clone https://github.com/OpenTalker/SadTalker.git
-
-# 9. Install SadTalker's requirements
-RUN pip install -r ${HOME}/app/SadTalker/requirements.txt
-
-# 10. Apply our known patches to the installed libraries
-RUN find ${HOME}/.pyenv/versions/${PYTHON_VERSION} -type f -name "my_awing_arch.py" -exec sed -i "s/np.float/float/g" {} +
-RUN find ${HOME}/.pyenv/versions/${PYTHON_VERSION} -type f -name "preprocess.py" -exec sed -i "s/trans_params = np.array(\[w0, h0, s, t\[0\], t\[1\]\])/trans_params = np.array([w0, h0, s, t[0], t[1]], dtype=object)/g" {} +
-
-# 11. Copy and install our own requirements
-COPY --chown=user requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-# 12. Install runpod
-RUN pip install runpod
-
-# 13. Copy our handler code
-COPY --chown=user handler.py ${HOME}/app/handler.py
-
-# 14. Set the final command to run our handler
+# 8. Set the runtime command
 CMD ["python", "handler.py"]
