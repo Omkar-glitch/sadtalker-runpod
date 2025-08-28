@@ -11,14 +11,9 @@ RUN apt-get update && apt-get install -y -q \
 # work from /workspace so our files are importable
 WORKDIR /workspace
 
-# SadTalker clone + its own requirements
-RUN git lfs install && \
-    git clone --depth 1 https://github.com/OpenTalker/SadTalker.git && \
-    cd SadTalker && pip install --no-cache-dir -r requirements.txt
-
-# our worker deps (adds fastapi/uvicorn/pydantic + your numpy/scipy pins)
+# SadTalker clone + combined requirements install
 COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r /workspace/requirements.txt
+RUN git lfs install &&     git clone --depth 1 https://github.com/OpenTalker/SadTalker.git &&     pip install --no-cache-dir -r SadTalker/requirements.txt &&     pip install --no-cache-dir -r /workspace/requirements.txt
 
 # our code
 COPY handler.py /workspace/handler.py
