@@ -3,12 +3,8 @@ from pathlib import Path
 import requests
 try:
     from runpod.serverless import start
-    print("[init] runpod.serverless.start imported successfully.")
-except Exception as e:
+except Exception:
     start = None
-    print(f"[init] FAILED to import runpod.serverless.start: {e}")
-    import traceback
-    traceback.print_exc()
 
 # --------------------------------------------------------------------------------
 # Config / Paths
@@ -165,10 +161,5 @@ def handler(event):
         return {"ok": False, "error": str(e)}
 
 if __name__ == "__main__":
-    print("[main] Script starting.")
     if start is not None:
-        print("[main] 'start' is not None, calling start().")
         start({"handler": handler})
-    else:
-        print("[main] 'start' is None, script will now exit.")
-    print("[main] Script finished.") # We should never see this if it works

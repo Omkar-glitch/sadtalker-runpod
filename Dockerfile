@@ -6,7 +6,7 @@ ENV TZ=Etc/UTC
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install git and ffmpeg
-RUN apt-get update && apt-get install -y -q git git-lfs ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y -q git git-lfs ffmpeg curl && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /workspace
