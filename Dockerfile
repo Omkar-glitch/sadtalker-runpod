@@ -13,19 +13,19 @@ WORKDIR /workspace
 
 # SadTalker clone + combined requirements install
 COPY requirements.txt /workspace/requirements.txt
-RUN git lfs install &&     git clone --depth 1 https://github.com/OpenTalker/SadTalker.git &&     pip install --no-cache-dir -r SadTalker/requirements.txt &&     pip install --no-cache-dir -r /workspace/requirements.txt
+RUN git lfs install && \
+    git clone --depth 1 https://github.com/OpenTalker/SadTalker.git && \
+    /opt/conda/bin/pip install --no-cache-dir -r SadTalker/requirements.txt && \
+    /opt/conda/bin/pip install --no-cache-dir -r /workspace/requirements.txt
 
 # our code
 COPY handler.py /workspace/handler.py
-
 COPY ensure_models_patch.py /workspace/ensure_models_patch.py
 
-# Diagnostic step to find python and pip
-RUN echo "--- Finding Python and Pip ---" && which python && which pip && ls -l /usr/bin/python* && ls -l /usr/local/bin/python* && echo "--- Diagnostics Done ---"
-
 # Final, forceful installation and verification of the runpod library
-RUN pip install runpod && python -c "import runpod; print('runpod library successfully verified')"
+RUN /opt/conda/bin/pip install runpod && \
+    /opt/conda/bin/python -c "import runpod; print('runpod library successfully verified')"
 
 # expose HTTP and start uvicorn web server on port 8000
 EXPOSE 8888
-CMD ["python", "/workspace/handler.py"]
+CMD ["/opt/conda/bin/python", "/workspace/handler.py"]
